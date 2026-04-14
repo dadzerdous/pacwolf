@@ -113,11 +113,11 @@ const Game = (() => {
     };
   }
 
-  function startLocal(roleList) {
-    // roleList: array like ['pacman','ghost','pacman',...] index 0 = local player
+  function startLocal(roleList, localId) {
     initDots();
-    players = roleList.map((role, i) => makePlayer(i, role, i > 0, i));
-    myId = 0;
+    // In multiplayer localId is the server-assigned id; in single player it's 0
+    if (localId !== undefined) myId = localId;
+    players = roleList.map((role, i) => makePlayer(i, role, i !== myId, i));
     startLoop();
   }
 
@@ -519,17 +519,23 @@ const Game = (() => {
   let lastInput = { wantDc: 0, wantDr: 0 };
   function getLastInput() { return lastInput; }
 
-  // Sync non-local players from server state
+  // Sync all players from server state
   function syncFromServer(state) {
     if (!state || !state.players) return;
     state.players.forEach(sp => {
-      const p = players.find(p => p.id === sp.id);
-      if (!p || p.id === myId) return;
+      let p = players.find(p => p.id === sp.id);
+      if (!p) {
+        // Player not in our local array yet — add them
+        p = makePlayer(sp.id, sp.role || 'pacman', true, sp.id);
+        players.push(p);
+      }
+      if (sp.id === myId) return; // don't override local player position
       p.px = sp.px; p.py = sp.py;
       p.alive = sp.alive;
       p.facing = sp.facing;
       p.mouth = sp.mouth;
       p.powerTimer = sp.powerTimer;
+      if (sp.role) p.role = sp.role;
     });
     if (state.dots) {
       dots.clear();

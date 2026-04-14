@@ -101,8 +101,11 @@ const App = (() => {
   function connectSocket() {
 if (socket) socket.disconnect();
 
-  // Passing no URL defaults to the host serving the page
-  socket = io(); 
+// Explicitly point to your backend server on Render
+socket = io('https://pacman-among-us.onrender.com', {
+  transports: ['polling', 'websocket'],
+  reconnection: true
+});
 
   socket.on('connect', () => {
     console.log("Connected with ID:", socket.id);

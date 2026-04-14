@@ -55,9 +55,11 @@ const Game = (() => {
   let onGameEnd = null;
   let setMsgFn = null;
   let myId = 0;
+  let isMultiplayerMode = false; // declared so MP fix code referencing it won't crash
 
   const joy = { dx: 0, dy: 0, active: false };
   let lastInput = { wantDc: 0, wantDr: 0 };
+  let joystickCleanup = null; // prevents listener stacking on replay
 
   function init(canvasEl, options = {}) {
     canvas = canvasEl;
@@ -65,6 +67,7 @@ const Game = (() => {
     onGameEnd = options.onEnd || null;
     setMsgFn = options.setMsg || null;
     myId = options.myId ?? 0;
+    isMultiplayerMode = options.isMulti ?? false;
     resizeCanvas();
   }
 
@@ -72,14 +75,17 @@ const Game = (() => {
     if (!canvas) return;
 
     const wrap = canvas.parentElement;
-    const maxW = wrap.clientWidth;
-    const maxH = wrap.clientHeight;
+    const maxW = wrap.clientWidth  || window.innerWidth;
+    const maxH = wrap.clientHeight || (window.innerHeight - 120); // approx HUD height
     const mazeW = COLS * CELL;
     const mazeH = ROWS * CELL;
     const scale = Math.min(maxW / mazeW, maxH / mazeH, 1);
 
-    canvas.width = Math.floor(mazeW * scale);
-    canvas.height = Math.floor(mazeH * scale);
+    // Guard: if scale is still 0 somehow, use a safe fallback
+    const safeScale = scale > 0 ? scale : 0.5;
+
+    canvas.width = Math.floor(mazeW * safeScale);
+    canvas.height = Math.floor(mazeH * safeScale);
     canvas.style.width = canvas.width + 'px';
     canvas.style.height = canvas.height + 'px';
   }
@@ -128,6 +134,7 @@ const Game = (() => {
   }
 
   function startLocal(roleList, localId) {
+    isMultiplayerMode = false;
     initDots();
 
     if (localId !== undefined) {
@@ -139,6 +146,8 @@ const Game = (() => {
   }
 
   function startLoop() {
+    // If called directly (not via startLocal), we're in multiplayer mode
+    if (players.length === 0) isMultiplayerMode = true;
     gameRunning = true;
 
     if (animFrame) {
@@ -649,12 +658,16 @@ const Game = (() => {
   }
 
   function setupJoystick(baseEl, knobEl) {
-    const R = baseEl.offsetWidth / 2;
+    // Clean up previous listeners to prevent stacking on replay
+    if (joystickCleanup) joystickCleanup();
+
+    const rawR = baseEl.offsetWidth / 2;
+    const R = rawR > 0 ? rawR : 65; // fallback if not yet painted
     let startX;
     let startY;
     let pointerId;
 
-    baseEl.addEventListener('pointerdown', (e) => {
+    const onDown = (e) => {
       e.preventDefault();
       baseEl.setPointerCapture(e.pointerId);
       pointerId = e.pointerId;
@@ -667,28 +680,36 @@ const Game = (() => {
       baseEl.classList.add('active');
 
       updateJoy(e.clientX, e.clientY, startX, startY, R, knobEl);
-    });
+    };
 
-    baseEl.addEventListener('pointermove', (e) => {
+    const onMove = (e) => {
       if (!joy.active || e.pointerId !== pointerId) return;
       e.preventDefault();
       updateJoy(e.clientX, e.clientY, startX, startY, R, knobEl);
-    });
+    };
 
     const endJoy = (e) => {
       if (e.pointerId !== pointerId) return;
-
       joy.dx = 0;
       joy.dy = 0;
       joy.active = false;
       lastInput = { wantDc: 0, wantDr: 0 };
-
       baseEl.classList.remove('active');
       knobEl.style.transform = 'translate(-50%, -50%)';
     };
 
+    baseEl.addEventListener('pointerdown', onDown);
+    baseEl.addEventListener('pointermove', onMove);
     baseEl.addEventListener('pointerup', endJoy);
     baseEl.addEventListener('pointercancel', endJoy);
+
+    // Store cleanup so next call removes these listeners
+    joystickCleanup = () => {
+      baseEl.removeEventListener('pointerdown', onDown);
+      baseEl.removeEventListener('pointermove', onMove);
+      baseEl.removeEventListener('pointerup', endJoy);
+      baseEl.removeEventListener('pointercancel', endJoy);
+    };
   }
 
   function updateJoy(cx, cy, startX, startY, R, knobEl) {

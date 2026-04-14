@@ -104,10 +104,9 @@ const App = (() => {
       socket = null;
     }
 
-    socket = io({
-      transports: ['websocket'],
-    });
-
+socket = io('https://pacman-among-us.onrender.com', {
+  transports: ['websocket'],
+});
     socket.on('connect', () => {
       socket.emit('join-lobby');
     });

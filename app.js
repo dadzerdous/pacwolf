@@ -104,8 +104,7 @@ const App = (() => {
           myId: myPlayerId,
         });
         Game.resizeCanvas();
-        const roles = serverPlayers.map(p => p.role);
-        Game.startLocal(roles, myPlayerId);
+
         startHudLoop();
         overlay.classList.add('hidden');
         setupJoystick();

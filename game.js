@@ -152,6 +152,7 @@ const Game = (() => {
   }
 
   function update(dt) {
+    if (isMultiplayerMode) return;
     // Apply joystick to local player
     const me = players.find(p => p.id === myId);
     if (me && me.alive && joy.active) {
@@ -525,7 +526,7 @@ const Game = (() => {
     state.players.forEach(sp => {
       let p = players.find(p => p.id === sp.id);
       if (!p) {
-        // Player not in our local array yet — add them
+        // Player not in our local array yet — add theupdaTE
         p = makePlayer(sp.id, sp.role || 'pacman', true, sp.id);
         players.push(p);
       }

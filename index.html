@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"/>
+  <title>Pac-Man Among Us</title>
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+
+<!-- SCREEN: Home -->
+<div id="screen-home" class="screen active">
+  <div class="home-inner">
+    <h1>PAC-MAN<br><span>AMONG US</span></h1>
+    <p class="tagline">Eat dots. Hunt ghosts. Trust no one.</p>
+    <button class="btn-big" onclick="App.chooseSingle()">Single Player</button>
+    <button class="btn-big secondary" onclick="App.chooseMulti()">Multiplayer</button>
+  </div>
+</div>
+
+<!-- SCREEN: Lobby -->
+<div id="screen-lobby" class="screen">
+  <div class="lobby-inner">
+    <h2>Lobby</h2>
+    <div id="lobby-code-wrap">
+      <p>Room code</p>
+      <div id="lobby-code">----</div>
+      <button class="btn-small" onclick="App.copyCode()">Copy</button>
+    </div>
+    <div id="lobby-players"></div>
+    <p class="lobby-hint">Waiting for players… AI will fill empty slots when you start.</p>
+    <button class="btn-big" id="btn-ready" onclick="App.setReady()">Ready</button>
+    <button class="btn-small secondary" onclick="App.backHome()" style="margin-top:8px">Leave</button>
+  </div>
+</div>
+
+<!-- SCREEN: Game -->
+<div id="screen-game" class="screen">
+  <div id="hud">
+    <span id="hud-role">PAC-MAN</span>
+    <span id="hud-dots">Dots: 0</span>
+    <div id="power-wrap">
+      <div id="power-bar"><div id="power-fill"></div></div>
+    </div>
+    <span id="hud-alive">Alive: 5</span>
+  </div>
+  <div id="canvas-wrap">
+    <canvas id="canvas"></canvas>
+    <div id="overlay" class="hidden">
+      <div id="overlay-content">
+        <h2 id="overlay-title"></h2>
+        <p id="overlay-msg"></p>
+        <button class="btn-big" onclick="App.overlayAction()">Play Again</button>
+        <button class="btn-small secondary" onclick="App.backHome()" style="margin-top:8px">Home</button>
+      </div>
+    </div>
+  </div>
+  <div id="bottom-hud">
+    <div id="msg-bar"></div>
+    <div id="joystick-wrap">
+      <div id="joystick-base">
+        <div id="joystick-knob"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="game.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

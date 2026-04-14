@@ -99,23 +99,20 @@ const App = (() => {
   }
 
   function connectSocket() {
-    if (socket) {
-      socket.disconnect();
-      socket = null;
-    }
+if (socket) socket.disconnect();
 
-// Connect to the current host instead of a hardcoded URL
-socket = io(window.location.origin, {
-  transports: ['polling', 'websocket'],
-  reconnection: true
-});
-    socket.on('connect', () => {
-      socket.emit('join-lobby');
-    });
+  // Passing no URL defaults to the host serving the page
+  socket = io(); 
 
-    socket.on('connect_error', (err) => {
-      msgBar.textContent = 'Connection error: ' + err.message;
-    });
+  socket.on('connect', () => {
+    console.log("Connected with ID:", socket.id);
+    socket.emit('join-lobby');
+  });
+
+  socket.on('connect_error', (err) => {
+    msgBar.textContent = 'Connection error: ' + err.message;
+    console.error("Socket Error:", err);
+  });
 
     socket.on('lobby-joined', ({ code, players }) => {
       roomCode = code;

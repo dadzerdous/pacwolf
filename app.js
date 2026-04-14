@@ -2,7 +2,6 @@
 
 const App = (() => {
   const ROLES_POOL = ['pacman', 'pacman', 'pacman', 'ghost', 'ghost'];
-  const MAX_PLAYERS = 5;
 
   let socket = null;
   let roomCode = null;
@@ -10,8 +9,8 @@ const App = (() => {
   let myPlayerId = 0;
   let isReady = false;
   let hudInterval = null;
+  let inputInterval = null;
 
-  // ── DOM refs ──
   const screens = {
     home: document.getElementById('screen-home'),
     lobby: document.getElementById('screen-lobby'),
@@ -35,7 +34,6 @@ const App = (() => {
     });
   }
 
-  // ── HOME ──
   function chooseSingle() {
     isMulti = false;
     launchSinglePlayer();
@@ -49,6 +47,7 @@ const App = (() => {
 
   function backHome() {
     if (socket) { socket.disconnect(); socket = null; }
+    clearInterval(inputInterval);
     Game.stopLoop();
     clearInterval(hudInterval);
     overlay.classList.add('hidden');
@@ -57,16 +56,15 @@ const App = (() => {
     roomCode = null;
   }
 
-  // ── SINGLE PLAYER ──
   function launchSinglePlayer() {
     showScreen('game');
     setTimeout(() => {
-      Game.resizeCanvas();
       Game.init(canvas, {
         onEnd: handleGameEnd,
         setMsg: m => { msgBar.textContent = m; },
         myId: 0,
       });
+      Game.resizeCanvas();
       const roles = shuffle([...ROLES_POOL]);
       Game.startLocal(roles);
       startHudLoop();
@@ -75,12 +73,15 @@ const App = (() => {
     }, 50);
   }
 
-  // ── MULTIPLAYER ──
   function connectSocket() {
     socket = io('https://pacwolf.onrender.com', { transports: ['websocket'] });
 
     socket.on('connect', () => {
       socket.emit('join-lobby');
+    });
+
+    socket.on('connect_error', (err) => {
+      msgBar.textContent = 'Connection error: ' + err.message;
     });
 
     socket.on('lobby-joined', ({ code, players }) => {
@@ -97,41 +98,41 @@ const App = (() => {
       myPlayerId = myId;
       showScreen('game');
       setTimeout(() => {
-        Game.resizeCanvas();
         Game.init(canvas, {
           onEnd: handleGameEnd,
           setMsg: m => { msgBar.textContent = m; },
           myId: myPlayerId,
         });
-        // Build player objects from server data
+        Game.resizeCanvas();
         const roles = serverPlayers.map(p => p.role);
         Game.startLocal(roles);
         startHudLoop();
         overlay.classList.add('hidden');
         setupJoystick();
 
-        // Send our inputs to server
-        setupMultiInput();
+        clearInterval(inputInterval);
+        inputInterval = setInterval(() => {
+          if (!socket || !socket.connected) return;
+          socket.emit('input', Game.getLastInput());
+        }, 50);
       }, 50);
     });
 
-    socket.on('player-input', ({ id, wantDc, wantDr }) => {
-      // Server relays other players' inputs — handled server-side, we just re-sync
-    });
-
     socket.on('game-state', (state) => {
-      // Full state sync from server (for multiplayer authoritative mode)
-      // For simplicity: each client runs its own sim but syncs periodically
+      Game.syncFromServer(state);
     });
-  }
 
-  function setupMultiInput() {
-    // Emit our input to server every ~50ms
-    setInterval(() => {
-      if (!socket || !socket.connected) return;
-      const me = Game.getMyInput();
-      if (me) socket.emit('input', me);
-    }, 50);
+    socket.on('player-died', ({ id }) => {
+      Game.killPlayer(id);
+    });
+
+    socket.on('game-over', ({ winner, dotsEaten }) => {
+      handleGameEnd(winner, dotsEaten);
+    });
+
+    socket.on('msg', (m) => {
+      msgBar.textContent = m;
+    });
   }
 
   function setReady() {
@@ -152,12 +153,11 @@ const App = (() => {
     players.forEach(p => {
       const div = document.createElement('div');
       div.className = 'lobby-player' + (p.ready ? ' ready' : '');
-      div.innerHTML = `<span class="dot"></span><span>${p.name}</span>`;
+      div.innerHTML = '<span class="dot"></span><span>' + p.name + '</span>';
       lobbyPlayers.appendChild(div);
     });
   }
 
-  // ── GAME ──
   function setupJoystick() {
     const base = document.getElementById('joystick-base');
     const knob = document.getElementById('joystick-knob');
@@ -173,10 +173,9 @@ const App = (() => {
     const role = Game.getMyRole();
     hudRole.textContent = role === 'ghost' ? 'GHOST' : 'PAC-MAN';
     hudRole.className = role === 'ghost' ? 'ghost' : '';
-    hudDots.textContent = `Dots: ${Game.getDotsEaten()}`;
+    hudDots.textContent = 'Dots: ' + Game.getDotsEaten();
     const counts = Game.getAliveCounts();
-    hudAlive.textContent = `Alive: ${counts.total}`;
-
+    hudAlive.textContent = 'Alive: ' + counts.total;
     if (role === 'pacman') {
       const t = Game.getMyPowerTimer();
       powerFill.style.width = Math.max(0, (t / 8) * 100) + '%';
@@ -190,10 +189,12 @@ const App = (() => {
 
   function handleGameEnd(winner, dotsEaten) {
     clearInterval(hudInterval);
+    clearInterval(inputInterval);
+    Game.stopLoop();
     const myRole = Game.getMyRole();
     const playerWon = (winner === 'pacmen' && myRole === 'pacman') || (winner === 'ghosts' && myRole === 'ghost');
     overlayTitle.textContent = winner === 'pacmen' ? 'Pac-Men Win! 🟡' : 'Ghosts Win! 👻';
-    overlayMsg.textContent = (playerWon ? 'You won! 🎉 ' : 'You lost. ') + `Dots eaten: ${dotsEaten}`;
+    overlayMsg.textContent = (playerWon ? 'You won! 🎉 ' : 'You lost. ') + 'Dots eaten: ' + dotsEaten;
     overlay.classList.remove('hidden');
   }
 
@@ -206,7 +207,6 @@ const App = (() => {
     }
   }
 
-  // ── UTILS ──
   function shuffle(a) {
     for (let i = a.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));

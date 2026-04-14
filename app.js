@@ -77,7 +77,7 @@ const App = (() => {
 
   // ── MULTIPLAYER ──
   function connectSocket() {
-    socket = io();
+    socket = io('https://pacwolf.onrender.com', { transports: ['websocket'] });
 
     socket.on('connect', () => {
       socket.emit('join-lobby');

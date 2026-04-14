@@ -105,7 +105,10 @@ const App = (() => {
     }
 
 socket = io('https://pacman-among-us.onrender.com', {
-  transports: ['websocket'],
+  transports: ['polling', 'websocket'],
+  reconnection: true,
+  reconnectionAttempts: 10,
+  reconnectionDelay: 1000,
 });
     socket.on('connect', () => {
       socket.emit('join-lobby');

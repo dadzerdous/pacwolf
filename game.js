@@ -479,6 +479,12 @@ const Game = (() => {
     if (dist > 0) { dx = (dx / dist) * clamp; dy = (dy / dist) * clamp; }
     joy.dx = dx / (R * 0.8);
     joy.dy = dy / (R * 0.8);
+    // update lastInput for server
+    const ax = Math.abs(joy.dx), ay = Math.abs(joy.dy);
+    if (ax > 0.25 || ay > 0.25) {
+      if (ax > ay) lastInput = { wantDc: joy.dx > 0 ? 1 : -1, wantDr: 0 };
+      else lastInput = { wantDc: 0, wantDr: joy.dy > 0 ? 1 : -1 };
+    }
     knobEl.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
   }
 
@@ -508,10 +514,41 @@ const Game = (() => {
     return Math.max(0, ...players.filter(p => p.alive && p.role === 'pacman' && p.powerTimer > 0).map(p => p.powerTimer));
   }
 
+
+  // Track last input for server relay
+  let lastInput = { wantDc: 0, wantDr: 0 };
+  function getLastInput() { return lastInput; }
+
+  // Sync non-local players from server state
+  function syncFromServer(state) {
+    if (!state || !state.players) return;
+    state.players.forEach(sp => {
+      const p = players.find(p => p.id === sp.id);
+      if (!p || p.id === myId) return;
+      p.px = sp.px; p.py = sp.py;
+      p.alive = sp.alive;
+      p.facing = sp.facing;
+      p.mouth = sp.mouth;
+      p.powerTimer = sp.powerTimer;
+    });
+    if (state.dots) {
+      dots.clear();
+      state.dots.forEach(([k, v]) => dots.set(k, v));
+    }
+    if (state.dotsEaten !== undefined) dotsEaten = state.dotsEaten;
+  }
+
+  // Kill a player by id (server authoritative death)
+  function killPlayer(id) {
+    const p = players.find(p => p.id === id);
+    if (p) p.alive = false;
+  }
+
   return {
     init, startLocal, syncState, startLoop, stopLoop,
     setupJoystick, getDotsEaten, getMyRole, getAliveCounts,
     getMyPowerTimer, getThreatTimer, resizeCanvas,
+    getLastInput, syncFromServer, killPlayer,
     MAZE_TEMPLATE, COLS, ROWS, CELL,
   };
 })();

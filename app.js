@@ -81,6 +81,7 @@ const App = (() => {
         onEnd: handleGameEnd,
         setMsg: (m) => { msgBar.textContent = m; },
         myId: 0,
+        isMulti: false,
       });
 
       Game.resizeCanvas();
@@ -91,6 +92,9 @@ const App = (() => {
       startHudLoop();
       overlay.classList.add('hidden');
       setupJoystick();
+
+      // Re-resize after browser paints the game screen (fixes 0x0 canvas bug)
+      requestAnimationFrame(() => Game.resizeCanvas());
     }, 50);
   }
 
@@ -131,6 +135,7 @@ const App = (() => {
           onEnd: handleGameEnd,
           setMsg: (m) => { msgBar.textContent = m; },
           myId: myPlayerId,
+          isMulti: true,
         });
 
         Game.resizeCanvas();
@@ -139,6 +144,8 @@ const App = (() => {
         startHudLoop();
         overlay.classList.add('hidden');
         setupJoystick();
+
+        requestAnimationFrame(() => Game.resizeCanvas());
 
         clearInterval(inputInterval);
         inputInterval = setInterval(() => {

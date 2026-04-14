@@ -102,7 +102,7 @@ const App = (() => {
 if (socket) socket.disconnect();
 
 // Explicitly point to your backend server on Render
-socket = io('https://pacman-among-us.onrender.com', {
+socket = io('https://pacwolf.onrender.com', {
   transports: ['polling', 'websocket'],
   reconnection: true
 });

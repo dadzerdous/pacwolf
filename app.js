@@ -104,11 +104,10 @@ const App = (() => {
       socket = null;
     }
 
-socket = io('https://pacman-among-us.onrender.com', {
+// Connect to the current host instead of a hardcoded URL
+socket = io(window.location.origin, {
   transports: ['polling', 'websocket'],
-  reconnection: true,
-  reconnectionAttempts: 10,
-  reconnectionDelay: 1000,
+  reconnection: true
 });
     socket.on('connect', () => {
       socket.emit('join-lobby');

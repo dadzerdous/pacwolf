@@ -16,6 +16,7 @@ const App = (() => {
     lobby: document.getElementById('screen-lobby'),
     game: document.getElementById('screen-game'),
   };
+
   const canvas = document.getElementById('canvas');
   const overlay = document.getElementById('overlay');
   const overlayTitle = document.getElementById('overlay-title');
@@ -29,8 +30,8 @@ const App = (() => {
   const lobbyPlayers = document.getElementById('lobby-players');
 
   function showScreen(name) {
-    Object.entries(screens).forEach(([k, el]) => {
-      el.classList.toggle('active', k === name);
+    Object.entries(screens).forEach(([key, el]) => {
+      el.classList.toggle('active', key === name);
     });
   }
 
@@ -46,27 +47,47 @@ const App = (() => {
   }
 
   function backHome() {
-    if (socket) { socket.disconnect(); socket = null; }
+    if (socket) {
+      socket.disconnect();
+      socket = null;
+    }
+
     clearInterval(inputInterval);
-    Game.stopLoop();
+    inputInterval = null;
+
     clearInterval(hudInterval);
+    hudInterval = null;
+
+    Game.stopLoop();
     overlay.classList.add('hidden');
     showScreen('home');
+
     isReady = false;
     roomCode = null;
+    myPlayerId = 0;
+
+    const btn = document.getElementById('btn-ready');
+    if (btn) {
+      btn.textContent = 'Ready';
+      btn.classList.remove('is-ready');
+    }
   }
 
   function launchSinglePlayer() {
     showScreen('game');
+
     setTimeout(() => {
       Game.init(canvas, {
         onEnd: handleGameEnd,
-        setMsg: m => { msgBar.textContent = m; },
+        setMsg: (m) => { msgBar.textContent = m; },
         myId: 0,
       });
+
       Game.resizeCanvas();
+
       const roles = shuffle([...ROLES_POOL]);
-      Game.startLocal(roles);
+      Game.startLocal(roles, 0);
+
       startHudLoop();
       overlay.classList.add('hidden');
       setupJoystick();
@@ -74,7 +95,14 @@ const App = (() => {
   }
 
   function connectSocket() {
-    socket = io('https://pacwolf.onrender.com', { transports: ['websocket'] });
+    if (socket) {
+      socket.disconnect();
+      socket = null;
+    }
+
+    socket = io({
+      transports: ['websocket'],
+    });
 
     socket.on('connect', () => {
       socket.emit('join-lobby');
@@ -94,16 +122,19 @@ const App = (() => {
       renderLobbyPlayers(players);
     });
 
-    socket.on('game-start', ({ players: serverPlayers, myId }) => {
+    socket.on('game-start', ({ myId }) => {
       myPlayerId = myId;
       showScreen('game');
+
       setTimeout(() => {
         Game.init(canvas, {
           onEnd: handleGameEnd,
-          setMsg: m => { msgBar.textContent = m; },
+          setMsg: (m) => { msgBar.textContent = m; },
           myId: myPlayerId,
         });
+
         Game.resizeCanvas();
+        Game.startLoop();
 
         startHudLoop();
         overlay.classList.add('hidden');
@@ -132,24 +163,33 @@ const App = (() => {
     socket.on('msg', (m) => {
       msgBar.textContent = m;
     });
+
+    socket.on('disconnect', () => {
+      msgBar.textContent = 'Disconnected from server.';
+    });
   }
 
   function setReady() {
     if (!socket) return;
+
     isReady = !isReady;
+
     const btn = document.getElementById('btn-ready');
     btn.textContent = isReady ? 'Unready' : 'Ready';
     btn.classList.toggle('is-ready', isReady);
+
     socket.emit('set-ready', { ready: isReady });
   }
 
   function copyCode() {
-    if (roomCode) navigator.clipboard.writeText(roomCode).catch(() => {});
+    if (!roomCode) return;
+    navigator.clipboard.writeText(roomCode).catch(() => {});
   }
 
   function renderLobbyPlayers(players) {
     lobbyPlayers.innerHTML = '';
-    players.forEach(p => {
+
+    players.forEach((p) => {
       const div = document.createElement('div');
       div.className = 'lobby-player' + (p.ready ? ' ready' : '');
       div.innerHTML = '<span class="dot"></span><span>' + p.name + '</span>';
@@ -172,9 +212,12 @@ const App = (() => {
     const role = Game.getMyRole();
     hudRole.textContent = role === 'ghost' ? 'GHOST' : 'PAC-MAN';
     hudRole.className = role === 'ghost' ? 'ghost' : '';
+
     hudDots.textContent = 'Dots: ' + Game.getDotsEaten();
+
     const counts = Game.getAliveCounts();
     hudAlive.textContent = 'Alive: ' + counts.total;
+
     if (role === 'pacman') {
       const t = Game.getMyPowerTimer();
       powerFill.style.width = Math.max(0, (t / 8) * 100) + '%';
@@ -188,10 +231,18 @@ const App = (() => {
 
   function handleGameEnd(winner, dotsEaten) {
     clearInterval(hudInterval);
+    hudInterval = null;
+
     clearInterval(inputInterval);
+    inputInterval = null;
+
     Game.stopLoop();
+
     const myRole = Game.getMyRole();
-    const playerWon = (winner === 'pacmen' && myRole === 'pacman') || (winner === 'ghosts' && myRole === 'ghost');
+    const playerWon =
+      (winner === 'pacmen' && myRole === 'pacman') ||
+      (winner === 'ghosts' && myRole === 'ghost');
+
     overlayTitle.textContent = winner === 'pacmen' ? 'Pac-Men Win! 🟡' : 'Ghosts Win! 👻';
     overlayMsg.textContent = (playerWon ? 'You won! 🎉 ' : 'You lost. ') + 'Dots eaten: ' + dotsEaten;
     overlay.classList.remove('hidden');
@@ -199,6 +250,7 @@ const App = (() => {
 
   function overlayAction() {
     overlay.classList.add('hidden');
+
     if (isMulti) {
       backHome();
     } else {
@@ -206,17 +258,24 @@ const App = (() => {
     }
   }
 
-  function shuffle(a) {
-    for (let i = a.length - 1; i > 0; i--) {
+  function shuffle(arr) {
+    for (let i = arr.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
-      [a[i], a[j]] = [a[j], a[i]];
+      [arr[i], arr[j]] = [arr[j], arr[i]];
     }
-    return a;
+    return arr;
   }
 
   window.addEventListener('resize', () => {
-    if (screens.game.classList.contains('active')) Game.resizeCanvas();
+    Game.resizeCanvas();
   });
 
-  return { chooseSingle, chooseMulti, backHome, setReady, copyCode, overlayAction };
+  return {
+    chooseSingle,
+    chooseMulti,
+    backHome,
+    setReady,
+    copyCode,
+    overlayAction,
+  };
 })();
